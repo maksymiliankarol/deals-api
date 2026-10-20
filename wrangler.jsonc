@@ -1,0 +1,29 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "deals-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-13",
+	"vars": {
+		"WEB_URL": "http://localhost:5173"
+	},
+	"d1_databases": [
+		{
+			"binding": "deals_db",
+			"database_name": "deals-db",
+			"database_id": "af4baa67-6d25-4123-b114-567169614481"
+		}
+	],
+	"ai": { "binding": "AI" },
+	"vectorize": [
+		{
+			"binding": "VECTORIZE_BUY",
+			"index_name": "buy-index-1536",
+			"remote": true
+		}
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	}
+}

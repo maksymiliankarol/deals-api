@@ -1,0 +1,37 @@
+import { Hono } from 'hono'
+import { vValidator } from '@hono/valibot-validator'
+import { createBuy } from '../schemas'
+import { insertBuy, indexBuy } from '../lib/buy'
+import { findContactInfo } from '../lib/contact-check'
+import { findContactInfoWithAI } from '../lib/contact-ai-check'
+import type { AppEnv } from '../types'
+
+const buy = new Hono<AppEnv>()
+
+buy.post('/', vValidator('json', createBuy), async (c) => {
+  const input = c.req.valid('json')
+
+  const ruleReason = findContactInfo(input.description)
+  const aiReason = ruleReason
+    ? null
+    : await findContactInfoWithAI(c.env, input.description)
+
+  if (ruleReason || aiReason) {
+    console.log('buy rejected by contact check', { ruleReason, aiReason })
+    return c.json(
+      {
+        error:
+          "Please don't include contact details in the description. They are shared automatically once your listing is unlocked.",
+        field: 'description',
+      },
+      422
+    )
+  }
+
+  const id = await insertBuy(c.env, input)
+  c.executionCtx.waitUntil(indexBuy(c.env, id, input.description))
+
+  return c.json({ id }, 201)
+})
+
+export default buy
