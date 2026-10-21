@@ -65,7 +65,6 @@ export async function findMatchingBuys(env: CloudflareBindings, description: str
       `SELECT id, description, tier, created_at
        FROM buy
        WHERE id IN (${ids.map(() => '?').join(',')})
-         AND is_unlocked = 0
          AND (reserved_until IS NULL OR reserved_until < ?)
          AND created_at >= ?`
     )

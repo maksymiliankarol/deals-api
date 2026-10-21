@@ -4,11 +4,14 @@ import { createBuy } from '../schemas'
 import { insertBuy, indexBuy } from '../lib/buy'
 import { findContactInfo } from '../lib/contact-check'
 import { findContactInfoWithAI } from '../lib/contact-ai-check'
+import { rateLimit } from '../lib/rate-limit'
+import { turnstile } from '../lib/turnstile'
 import type { AppEnv } from '../types'
+import { jsonBodyLimit } from '../lib/body-limit'
 
 const buy = new Hono<AppEnv>()
 
-buy.post('/', vValidator('json', createBuy), async (c) => {
+buy.post('/', rateLimit('RL_BUY'), jsonBodyLimit, turnstile, vValidator('json', createBuy), async (c) => {
   const input = c.req.valid('json')
 
   const ruleReason = findContactInfo(input.description)

@@ -7,10 +7,12 @@ export type ContactReason =
 
 const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF\u00AD]/g
 
-// Runs on a copy only; store the original description untouched.
+// Runs on a copy only: lowercasing and whitespace-collapsing must never reach
+// the stored text. (The schema already canonicalizes what gets stored.)
 export function normalize(text: string): string {
   return text
-    .normalize('NFKC') // full-width and fancy characters become plain ASCII
+    .normalize('NFKD') // fancy characters become plain, accents split off
+    .replace(/\p{M}/gu, '') // combining marks: strikethroughs, accents, variation selectors
     .replace(ZERO_WIDTH, '')
     .replace(/[\u2018\u2019]/g, "'")
     .toLowerCase()

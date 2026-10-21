@@ -2,12 +2,13 @@ import Stripe from 'stripe'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { getStripe } from '../lib/stripe'
-import { markBuyUnlocked } from '../lib/unlock'
 import type { AppEnv } from '../types'
+import { fulfillUnlock } from '../lib/unlock'
+import { bodyLimit } from 'hono/body-limit'
 
 const stripeWebhook = new Hono<AppEnv>()
 
-stripeWebhook.post('/', async (c) => {
+stripeWebhook.post('/', bodyLimit({ maxSize: 1024 * 1024 }), async (c) => {
   const signature = c.req.header('stripe-signature')
   if (!signature) throw new HTTPException(400, { message: 'Missing signature' })
 
@@ -34,13 +35,7 @@ stripeWebhook.post('/', async (c) => {
     const session = event.data.object
 
     if (session.payment_status === 'paid') {
-      const buyId = Number(session.metadata?.buy_id)
-
-      if (Number.isInteger(buyId) && buyId > 0) {
-        await markBuyUnlocked(c.env, buyId)
-      } else {
-        console.warn(`Paid session ${session.id} has no usable buy_id`)
-      }
+      await fulfillUnlock(c.env, session)
     }
   }
 

@@ -3,19 +3,14 @@ import Stripe from 'stripe'
 import { buyExpiryCutoff, toDbDate } from './buy'
 import { priceCentsForTier } from './pricing'
 import { getStripe } from './stripe'
+import { deleteVectors } from './vectorize'
 
 const MINUTE_MS = 60 * 1000
 // Stripe requires a session to live at least 30 minutes. The hold outlasts the
 // session, so a buy is never released while its checkout can still be paid.
+const UNLOCKED_TTL_MS = 24 * 60 * MINUTE_MS
 const SESSION_MINUTES = 31
 const HOLD_MINUTES = 33
-
-type ClaimedBuy = {
-  description: string
-  tier: number
-  email: string
-  phone: string
-}
 
 export type UnlockedDetails = {
   description: string
@@ -37,11 +32,10 @@ export async function createUnlockCheckout(
   const buy = await env.deals_db
     .prepare(
       `UPDATE buy SET reserved_until = ?
-       WHERE id = ?
-         AND is_unlocked = 0
-         AND (reserved_until IS NULL OR reserved_until < ?)
-         AND created_at >= ?
-       RETURNING description, tier, email, phone`
+      WHERE id = ?
+        AND (reserved_until IS NULL OR reserved_until < ?)
+        AND created_at >= ?
+      RETURNING tier`
     )
     .bind(
       toDbDate(new Date(now + HOLD_MINUTES * MINUTE_MS)),
@@ -49,7 +43,7 @@ export async function createUnlockCheckout(
       toDbDate(new Date(now)),
       buyExpiryCutoff()
     )
-    .first<ClaimedBuy>()
+    .first<{ tier: number }>()
 
   if (!buy) {
     throw new HTTPException(409, { message: 'This listing is no longer available' })
@@ -73,13 +67,7 @@ export async function createUnlockCheckout(
       success_url: `${env.WEB_URL}/unlock/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${env.WEB_URL}/my-listings/${listingId}`,
       // The success page reads these back from Stripe after the buy is gone.
-      metadata: {
-        buy_id: String(id),
-        tier: String(buy.tier),
-        description: buy.description,
-        email: buy.email,
-        phone: buy.phone
-      }
+      metadata: { buy_id: String(id) }
     })
 
     if (!session.url) throw new Error('Stripe returned no checkout URL')
@@ -98,12 +86,40 @@ export async function createUnlockCheckout(
   }
 }
 
-export async function markBuyUnlocked(env: CloudflareBindings, buyId: number) {
-  // Idempotent: Stripe can deliver the same event more than once.
-  await env.deals_db
-    .prepare('UPDATE buy SET is_unlocked = 1, reserved_until = NULL WHERE id = ?')
-    .bind(buyId)
-    .run()
+// Moves a paid buy into `unlocked`. Safe to call any number of times, from the
+// webhook and from the success page: later calls find nothing left to move.
+export async function fulfillUnlock(env: CloudflareBindings, session: Stripe.Checkout.Session) {
+  const buyId = Number(session.metadata?.buy_id)
+  if (!Number.isInteger(buyId) || buyId <= 0) {
+    console.warn(`Paid session ${session.id} has no usable buy_id`)
+    return
+  }
+
+  // One transaction: the details are never in both tables, or in neither.
+  const [insert] = await env.deals_db.batch([
+    env.deals_db
+      .prepare(
+        `INSERT OR IGNORE INTO unlocked
+           (session_id, description, tier, email, phone, price_cents, purchased_at)
+         SELECT ?, description, tier, email, phone, ?, ? FROM buy WHERE id = ?`
+      )
+      .bind(
+        session.id,
+        session.amount_total ?? 0,
+        new Date(session.created * 1000).toISOString(),
+        buyId
+      ),
+    env.deals_db.prepare('DELETE FROM buy WHERE id = ?').bind(buyId)
+  ])
+
+  // Only the call that did the move cleans up. Best effort: search skips ids with no row anyway.
+  if (insert.meta.changes > 0) {
+    try {
+      await deleteVectors(env.VECTORIZE_BUY, [buyId])
+    } catch (err) {
+      console.error(`Could not delete vector for buy ${buyId}`, err)
+    }
+  }
 }
 
 export async function getUnlockedDetails(
@@ -127,19 +143,32 @@ export async function getUnlockedDetails(
     throw new HTTPException(402, { message: 'Payment not completed' })
   }
 
-  // Sessions that didn't come from createUnlockCheckout have no metadata like this.
-  const { description, email, phone, tier } = session.metadata ?? {}
-  if (!description || !email || !phone || tier === undefined) {
+  // in getUnlockedDetails, after the payment_status check:
+  if (!session.metadata?.buy_id) {
     throw new HTTPException(404, { message: 'Checkout session not found' })
   }
 
-  return {
-    description,
-    tier: Number(tier),
-    email,
-    phone,
-    price_cents: session.amount_total ?? 0,
-    // Session creation time: within minutes of payment, good enough for a receipt.
-    purchased_at: new Date(session.created * 1000).toISOString()
+  await fulfillUnlock(env, session)
+
+  const row = await env.deals_db
+    .prepare(
+      `SELECT description, tier, email, phone, price_cents, purchased_at
+      FROM unlocked WHERE session_id = ?`
+    )
+    .bind(session.id)
+    .first<UnlockedDetails>()
+
+  if (!row) {
+    // Paid recently but nothing to hand over: the buy was gone before we could move it.
+    if (Date.now() - session.created * 1000 < UNLOCKED_TTL_MS) {
+      console.error(`Paid session ${session.id} has no details to deliver`)
+    }
+    throw new HTTPException(410, { message: 'These details are no longer available' })
   }
+
+  return row
+}
+
+export function unlockedExpiryCutoff() {
+  return toDbDate(new Date(Date.now() - UNLOCKED_TTL_MS))
 }

@@ -4,7 +4,7 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-10-13",
 	"vars": {
-		"WEB_URL": "http://localhost:5173"
+		"WEB_URL": "https://deals.metalogrom.com"
 	},
 	"d1_databases": [
 		{
@@ -15,15 +15,46 @@
 	],
 	"ai": { "binding": "AI" },
 	"vectorize": [
-		{
-			"binding": "VECTORIZE_BUY",
-			"index_name": "buy-index-1536",
-			"remote": true
-		}
+		{ "binding": "VECTORIZE_BUY", "index_name": "buy-index-1536" }
+	],
+	"ratelimits": [
+		{ "name": "RL_BUY", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
+		{ "name": "RL_SEARCH", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+		{ "name": "RL_UNLOCK", "namespace_id": "1003", "simple": { "limit": 5, "period": 60 } },
+		{ "name": "RL_SESSION", "namespace_id": "1004", "simple": { "limit": 20, "period": 60 } }
 	],
 	"triggers": {
 		"crons": [
 			"0 * * * *"
 		]
+	},
+
+	// Local development: `wrangler dev -e dev`.
+	// Named environments inherit no bindings or vars, so all of them are repeated.
+	"env": {
+		"dev": {
+			"vars": {
+				"WEB_URL": "http://localhost:5173"
+			},
+			"d1_databases": [
+				{
+					"binding": "deals_db",
+					"database_name": "deals-db",
+					// Same id as production so existing local data keeps working.
+					// Stays local-only unless --remote is passed.
+					"database_id": "af4baa67-6d25-4123-b114-567169614481"
+				}
+			],
+			"ai": { "binding": "AI" },
+			"vectorize": [
+				{ "binding": "VECTORIZE_BUY", "index_name": "buy-index-1536-dev", "remote": true }
+			],
+			"ratelimits": [
+				{ "name": "RL_BUY", "namespace_id": "2001", "simple": { "limit": 5, "period": 60 } },
+				{ "name": "RL_SEARCH", "namespace_id": "2002", "simple": { "limit": 10, "period": 60 } },
+				{ "name": "RL_UNLOCK", "namespace_id": "2003", "simple": { "limit": 5, "period": 60 } },
+				{ "name": "RL_SESSION", "namespace_id": "2004", "simple": { "limit": 20, "period": 60 } }
+			]
+		}
 	}
 }
