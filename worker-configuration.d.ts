@@ -13,7 +13,7 @@ interface __BaseEnv_CloudflareBindings {
 	STRIPE_SECRET_KEY: string;
 	STRIPE_WEBHOOK_SECRET: string;
 	AI_GATEWAY_API_KEY: string;
-	TURNSTILE_SECRET_KEY: string;
+	TURNSTILE_SECRET: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -31,7 +31,7 @@ declare namespace Cloudflare {
 		STRIPE_SECRET_KEY: string;
 		STRIPE_WEBHOOK_SECRET: string;
 		AI_GATEWAY_API_KEY: string;
-		TURNSTILE_SECRET_KEY: string;
+		TURNSTILE_SECRET: string;
 	}
 	interface Env extends __BaseEnv_CloudflareBindings {}
 }
@@ -40,7 +40,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "WEB_URL" | "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET" | "AI_GATEWAY_API_KEY" | "TURNSTILE_SECRET_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "WEB_URL" | "STRIPE_SECRET_KEY" | "STRIPE_WEBHOOK_SECRET" | "AI_GATEWAY_API_KEY" | "TURNSTILE_SECRET">> {}
 }
 declare module "*.txt" {
 	const value: string;

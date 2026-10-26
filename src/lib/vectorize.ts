@@ -19,7 +19,9 @@ export async function indexDescription(
   try {
     const values = await embedText(description, 'document')
     await upsertVector(index, id, values)
+    return true
   } catch (err) {
     console.error(`Indexing failed for ${label} ${id}`, err)
+    return false
   }
 }

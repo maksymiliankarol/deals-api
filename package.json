@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "wrangler dev -e dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:migrate": "wrangler d1 migrations apply deals-db --local",
+    "db:migrate:prod": "wrangler d1 migrations apply deals-db --remote"
   },
   "dependencies": {
     "@hono/valibot-validator": "^0.6.1",

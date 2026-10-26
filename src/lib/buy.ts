@@ -45,8 +45,17 @@ export async function insertBuy(env: CloudflareBindings, input: BuyInput) {
   return row.id
 }
 
-export function indexBuy(env: CloudflareBindings, id: number, description: string) {
-  return indexDescription(env.VECTORIZE_BUY, 'buy', id, description)
+export async function indexBuy(env: CloudflareBindings, id: number, description: string) {
+  const ok = await indexDescription(env.VECTORIZE_BUY, 'buy', id, description)
+  if (!ok) return false
+
+  try {
+    await env.deals_db.prepare('UPDATE buy SET indexed = 1 WHERE id = ?').bind(id).run()
+  } catch (err) {
+    console.error(`Could not mark buy ${id} as indexed`, err)
+    return false
+  }
+  return true
 }
 
 export async function findMatchingBuys(env: CloudflareBindings, description: string) {

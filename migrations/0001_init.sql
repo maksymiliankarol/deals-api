@@ -1,7 +1,4 @@
-DROP TABLE IF EXISTS buy;
-DROP TABLE IF EXISTS unlocked;
-
-CREATE TABLE buy (
+CREATE TABLE IF NOT EXISTS buy (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   description    TEXT NOT NULL,
   reserved_until TEXT,
@@ -10,9 +7,9 @@ CREATE TABLE buy (
   phone          TEXT NOT NULL,
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_buy_created_at ON buy (created_at);
+CREATE INDEX IF NOT EXISTS idx_buy_created_at ON buy (created_at);
 
-CREATE TABLE unlocked (
+CREATE TABLE IF NOT EXISTS unlocked (
   session_id   TEXT PRIMARY KEY,
   description  TEXT NOT NULL,
   tier         INTEGER NOT NULL,
@@ -22,4 +19,4 @@ CREATE TABLE unlocked (
   purchased_at TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_unlocked_created_at ON unlocked (created_at);
+CREATE INDEX IF NOT EXISTS idx_unlocked_created_at ON unlocked (created_at);

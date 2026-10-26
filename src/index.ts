@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import buy from './routes/buy'
-import { deleteExpiredDeals } from './jobs/cleanup'
+import { HTTPException } from 'hono/http-exception'
 import type { AppEnv } from './types'
+import buy from './routes/buy'
 import search from './routes/search'
 import unlock from './routes/unlock'
 import stripeWebhook from './routes/stripe-webhook'
+import { deleteExpiredDeals } from './jobs/cleanup'
+import { reindexMissing } from './jobs/reindex'
 
 const app = new Hono<AppEnv>()
 
@@ -18,6 +20,17 @@ app.use('/api/*', (c, next) =>
     maxAge: 86400
   })(c, next)
 )
+
+app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return c.json({ error: err.message }, err.status)
+  }
+  console.error('unhandled error', err) // shows up in observability
+  return c.json({ error: 'Something went wrong' }, 500)
+})
+
+app.notFound((c) => c.json({ error: 'Not found' }, 404))
+
 app.route('/api/buy', buy)
 app.route('/api/search', search)
 app.route('/api/unlock', unlock)
@@ -26,6 +39,6 @@ app.route('/api/stripe/webhook', stripeWebhook)
 export default {
   fetch: app.fetch,
   scheduled(_controller, env, ctx) {
-    ctx.waitUntil(deleteExpiredDeals(env))
+    ctx.waitUntil(Promise.allSettled([deleteExpiredDeals(env), reindexMissing(env)]))
   }
 } satisfies ExportedHandler<CloudflareBindings>

@@ -20,7 +20,8 @@ unlock.post(
     const { id } = c.req.valid('param')
     const { listingId } = c.req.valid('json')
 
-    const url = await createUnlockCheckout(c.env, id, listingId)
+    const ip = c.req.header('cf-connecting-ip') ?? 'unknown'
+    const url = await createUnlockCheckout(c.env, id, listingId, ip)
 
     return c.json({ url })
   }

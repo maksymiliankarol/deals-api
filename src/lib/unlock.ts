@@ -11,6 +11,7 @@ const MINUTE_MS = 60 * 1000
 const UNLOCKED_TTL_MS = 24 * 60 * MINUTE_MS
 const SESSION_MINUTES = 31
 const HOLD_MINUTES = 33
+const MAX_HOLDS_PER_IP = 2
 
 export type UnlockedDetails = {
   description: string
@@ -24,9 +25,18 @@ export type UnlockedDetails = {
 export async function createUnlockCheckout(
   env: CloudflareBindings,
   id: number,
-  listingId: string
+  listingId: string,
+  ip: string
 ) {
   const now = Date.now()
+
+  const holds = await env.deals_db
+    .prepare('SELECT COUNT(*) AS n FROM buy WHERE reserved_by = ? AND reserved_until >= ?')
+    .bind(ip, toDbDate(new Date(now)))
+    .first<{ n: number }>()
+  if ((holds?.n ?? 0) >= MAX_HOLDS_PER_IP) {
+    throw new HTTPException(429, { message: 'You already have open checkouts. Finish or wait for them first.' })
+  }
 
   // Claim the buy and read it in one atomic statement: only one caller can win.
   const buy = await env.deals_db
@@ -39,6 +49,7 @@ export async function createUnlockCheckout(
     )
     .bind(
       toDbDate(new Date(now + HOLD_MINUTES * MINUTE_MS)),
+      ip,
       id,
       toDbDate(new Date(now)),
       buyExpiryCutoff()
@@ -78,7 +89,7 @@ export async function createUnlockCheckout(
 
     // Give the buy back right away instead of holding it for nothing.
     await env.deals_db
-      .prepare('UPDATE buy SET reserved_until = NULL WHERE id = ?')
+      .prepare('UPDATE buy SET reserved_until = NULL, reserved_by = NULL WHERE id = ?')
       .bind(id)
       .run()
 

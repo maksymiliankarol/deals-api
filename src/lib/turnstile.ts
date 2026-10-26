@@ -5,6 +5,7 @@ const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
 type SiteverifyResponse = {
   success: boolean
+  hostname?: string
   'error-codes'?: string[]
 }
 
@@ -13,7 +14,7 @@ export const turnstile = createMiddleware<AppEnv>(async (c, next) => {
   if (!token) return c.json({ error: 'Please complete the verification' }, 403)
 
   const body = new URLSearchParams({
-    secret: c.env.TURNSTILE_SECRET_KEY,
+    secret: c.env.TURNSTILE_SECRET,
     response: token
   })
   const ip = c.req.header('cf-connecting-ip')
@@ -38,6 +39,14 @@ export const turnstile = createMiddleware<AppEnv>(async (c, next) => {
     console.log('turnstile rejected', { codes: result['error-codes'] })
     return c.json({ error: 'Verification failed. Please try again.' }, 403)
   }
+
+    // Prod only: Cloudflare's dummy test keys report hostname "example.com",
+    // and local dev reports "localhost", so neither would match the real site.
+    const site = new URL(c.env.WEB_URL)
+    if (site.protocol === 'https:' && result.hostname !== site.hostname) {
+      console.log('turnstile hostname mismatch', { hostname: result.hostname })
+      return c.json({ error: 'Verification failed. Please try again.' }, 403)
+    }
 
   await next()
 })
