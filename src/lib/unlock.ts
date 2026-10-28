@@ -41,7 +41,7 @@ export async function createUnlockCheckout(
   // Claim the buy and read it in one atomic statement: only one caller can win.
   const buy = await env.deals_db
     .prepare(
-      `UPDATE buy SET reserved_until = ?
+      `UPDATE buy SET reserved_until = ?, reserved_by = ?
       WHERE id = ?
         AND (reserved_until IS NULL OR reserved_until < ?)
         AND created_at >= ?
