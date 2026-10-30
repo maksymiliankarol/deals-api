@@ -8,6 +8,7 @@ import unlock from './routes/unlock'
 import stripeWebhook from './routes/stripe-webhook'
 import { deleteExpiredDeals } from './jobs/cleanup'
 import { reindexMissing } from './jobs/reindex'
+import { ApiException, errorBody } from './lib/error-codes'
 
 const app = new Hono<AppEnv>()
 
@@ -22,14 +23,19 @@ app.use('/api/*', (c, next) =>
 )
 
 app.onError((err, c) => {
+  if (err instanceof ApiException) return c.json(errorBody(err.code), err.status)
+
+  // Thrown by Hono itself (for example malformed JSON in the validator):
+  // never forward its message.
   if (err instanceof HTTPException) {
-    return c.json({ error: err.message }, err.status)
+    return c.json(errorBody(err.status === 400 ? 'invalid_input' : 'internal'), err.status)
   }
+
   console.error('unhandled error', err) // shows up in observability
-  return c.json({ error: 'Something went wrong' }, 500)
+  return c.json(errorBody('internal'), 500)
 })
 
-app.notFound((c) => c.json({ error: 'Not found' }, 404))
+app.notFound((c) => c.json(errorBody('not_found'), 404))
 
 app.route('/api/buy', buy)
 app.route('/api/search', search)

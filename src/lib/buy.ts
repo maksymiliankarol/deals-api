@@ -1,9 +1,9 @@
-import { HTTPException } from 'hono/http-exception'
 import type { InferOutput } from 'valibot'
 import type { createBuy } from '../schemas'
 import { indexDescription } from './vectorize'
 import { embedText } from './embed'
 import { priceCentsForTier } from './pricing'
+import { ApiException } from './error-codes'
 
 type BuyInput = InferOutput<typeof createBuy>
 
@@ -40,7 +40,7 @@ export async function insertBuy(env: CloudflareBindings, input: BuyInput) {
     .bind(description, tier, email, phone)
     .first<{ id: number }>()
 
-  if (!row) throw new HTTPException(500, { message: 'Failed to create buy' })
+  if (!row) throw new ApiException(500, 'internal')
 
   return row.id
 }

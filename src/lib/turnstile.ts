@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'
+import { errorBody } from './error-codes'
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
@@ -11,7 +12,7 @@ type SiteverifyResponse = {
 
 export const turnstile = createMiddleware<AppEnv>(async (c, next) => {
   const token = c.req.header('x-turnstile-token')
-  if (!token) return c.json({ error: 'Please complete the verification' }, 403)
+  if (!token) return c.json(errorBody('verification_required'), 403)
 
   const body = new URLSearchParams({
     secret: c.env.TURNSTILE_SECRET,
@@ -32,12 +33,12 @@ export const turnstile = createMiddleware<AppEnv>(async (c, next) => {
   } catch (err) {
     // Fail closed: with no verdict, nothing gets through.
     console.error('turnstile siteverify failed', err)
-    return c.json({ error: 'Verification is unavailable. Please try again.' }, 503)
+    return c.json(errorBody('verification_unavailable'), 503)
   }
 
   if (!result.success) {
     console.log('turnstile rejected', { codes: result['error-codes'] })
-    return c.json({ error: 'Verification failed. Please try again.' }, 403)
+    return c.json(errorBody('verification_failed'), 403)
   }
 
     // Prod only: Cloudflare's dummy test keys report hostname "example.com",
@@ -45,7 +46,7 @@ export const turnstile = createMiddleware<AppEnv>(async (c, next) => {
     const site = new URL(c.env.WEB_URL)
     if (site.protocol === 'https:' && result.hostname !== site.hostname) {
       console.log('turnstile hostname mismatch', { hostname: result.hostname })
-      return c.json({ error: 'Verification failed. Please try again.' }, 403)
+      return c.json(errorBody('verification_failed'), 403)
     }
 
   await next()

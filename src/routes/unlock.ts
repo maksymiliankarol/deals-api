@@ -6,6 +6,7 @@ import { rateLimit } from '../lib/rate-limit'
 import { turnstile } from '../lib/turnstile'
 import type { AppEnv } from '../types'
 import { jsonBodyLimit } from '../lib/body-limit'
+import { invalidInput } from '../lib/validation-hook'
 
 const unlock = new Hono<AppEnv>()
 
@@ -14,8 +15,8 @@ unlock.post(
   rateLimit('RL_UNLOCK'),
   jsonBodyLimit,
   turnstile,
-  vValidator('param', unlockParam),
-  vValidator('json', unlockBody),
+  vValidator('param', unlockParam, invalidInput),
+  vValidator('json', unlockBody, invalidInput),
   async (c) => {
     const { id } = c.req.valid('param')
     const { listingId } = c.req.valid('json')
@@ -27,7 +28,7 @@ unlock.post(
   }
 )
 
-unlock.get('/session/:sessionId', rateLimit('RL_SESSION'), vValidator('param', sessionParam), async (c) => {
+unlock.get('/session/:sessionId', rateLimit('RL_SESSION'), vValidator('param', sessionParam, invalidInput), async (c) => {
   const { sessionId } = c.req.valid('param')
 
   const details = await getUnlockedDetails(c.env, sessionId)

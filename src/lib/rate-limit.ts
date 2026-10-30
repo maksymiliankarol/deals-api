@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'
+import { errorBody } from './error-codes'
 
 type LimiterName = 'RL_BUY' | 'RL_SEARCH' | 'RL_UNLOCK' | 'RL_SESSION'
 
@@ -12,7 +13,7 @@ export const rateLimit = (name: LimiterName) =>
     const { success } = await c.env[name].limit({ key })
     if (!success) {
       c.header('Retry-After', '60')
-      return c.json({ error: 'Too many requests. Please try again in a minute.' }, 429)
+      return c.json(errorBody('rate_limited'), 429)
     }
 
     await next()

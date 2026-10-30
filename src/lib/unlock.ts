@@ -1,9 +1,9 @@
-import { HTTPException } from 'hono/http-exception'
 import Stripe from 'stripe'
 import { buyExpiryCutoff, toDbDate } from './buy'
 import { priceCentsForTier } from './pricing'
 import { getStripe } from './stripe'
 import { deleteVectors } from './vectorize'
+import { ApiException } from './error-codes'
 
 const MINUTE_MS = 60 * 1000
 // Stripe requires a session to live at least 30 minutes. The hold outlasts the
@@ -35,7 +35,7 @@ export async function createUnlockCheckout(
     .bind(ip, toDbDate(new Date(now)))
     .first<{ n: number }>()
   if ((holds?.n ?? 0) >= MAX_HOLDS_PER_IP) {
-    throw new HTTPException(429, { message: 'You already have open checkouts. Finish or wait for them first.' })
+    throw new ApiException(429, 'too_many_checkouts')
   }
 
   // Claim the buy and read it in one atomic statement: only one caller can win.
@@ -57,7 +57,7 @@ export async function createUnlockCheckout(
     .first<{ tier: number }>()
 
   if (!buy) {
-    throw new HTTPException(409, { message: 'This listing is no longer available' })
+    throw new ApiException(409, 'listing_unavailable')
   }
 
   try {
@@ -93,7 +93,7 @@ export async function createUnlockCheckout(
       .bind(id)
       .run()
 
-    throw new HTTPException(502, { message: 'Could not start checkout' })
+    throw new ApiException(502, 'checkout_failed')
   }
 }
 
@@ -144,19 +144,19 @@ export async function getUnlockedDetails(
   } catch (err) {
     if (err instanceof Stripe.errors.StripeInvalidRequestError) {
       // An id that looks right but Stripe doesn't know.
-      throw new HTTPException(404, { message: 'Checkout session not found' })
+      throw new ApiException(404, 'session_not_found')   // Stripe doesn't know the id
     }
     console.error(`Could not retrieve session ${sessionId}`, err)
-    throw new HTTPException(502, { message: 'Could not reach the payment provider' })
+    throw new ApiException(502, 'payment_unavailable')
   }
 
   if (session.payment_status !== 'paid') {
-    throw new HTTPException(402, { message: 'Payment not completed' })
+    throw new ApiException(402, 'payment_incomplete')
   }
 
   // in getUnlockedDetails, after the payment_status check:
   if (!session.metadata?.buy_id) {
-    throw new HTTPException(404, { message: 'Checkout session not found' })
+    throw new ApiException(404, 'session_not_found')   // no buy_id in metadata
   }
 
   await fulfillUnlock(env, session)
@@ -174,7 +174,7 @@ export async function getUnlockedDetails(
     if (Date.now() - session.created * 1000 < UNLOCKED_TTL_MS) {
       console.error(`Paid session ${session.id} has no details to deliver`)
     }
-    throw new HTTPException(410, { message: 'These details are no longer available' })
+    throw new ApiException(410, 'details_gone')
   }
 
   return row

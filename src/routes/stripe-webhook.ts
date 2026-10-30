@@ -1,16 +1,16 @@
 import Stripe from 'stripe'
 import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import { getStripe } from '../lib/stripe'
 import type { AppEnv } from '../types'
 import { fulfillUnlock } from '../lib/unlock'
 import { bodyLimit } from 'hono/body-limit'
+import { ApiException } from '../lib/error-codes'
 
 const stripeWebhook = new Hono<AppEnv>()
 
 stripeWebhook.post('/', bodyLimit({ maxSize: 1024 * 1024 }), async (c) => {
   const signature = c.req.header('stripe-signature')
-  if (!signature) throw new HTTPException(400, { message: 'Missing signature' })
+  if (!signature) throw new ApiException(400, 'missing_signature')
 
   // Verification needs the exact raw body, so read text, not json.
   const body = await c.req.text()
@@ -25,8 +25,8 @@ stripeWebhook.post('/', bodyLimit({ maxSize: 1024 * 1024 }), async (c) => {
       Stripe.createSubtleCryptoProvider()
     )
   } catch {
-    throw new HTTPException(400, { message: 'Invalid signature' })
-  }
+  throw new ApiException(400, 'invalid_signature') 
+}
 
   if (
     event.type === 'checkout.session.completed' ||

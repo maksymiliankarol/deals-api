@@ -8,10 +8,12 @@ import { rateLimit } from '../lib/rate-limit'
 import { turnstile } from '../lib/turnstile'
 import type { AppEnv } from '../types'
 import { jsonBodyLimit } from '../lib/body-limit'
+import { invalidInput } from '../lib/validation-hook'
+import { errorBody } from '../lib/error-codes'
 
 const buy = new Hono<AppEnv>()
 
-buy.post('/', rateLimit('RL_BUY'), jsonBodyLimit, turnstile, vValidator('json', createBuy), async (c) => {
+buy.post('/', rateLimit('RL_BUY'), jsonBodyLimit, turnstile, vValidator('json', createBuy, invalidInput), async (c) => {
   const input = c.req.valid('json')
 
   const ruleReason = findContactInfo(input.description)
@@ -21,14 +23,7 @@ buy.post('/', rateLimit('RL_BUY'), jsonBodyLimit, turnstile, vValidator('json', 
 
   if (ruleReason || aiReason) {
     console.log('buy rejected by contact check', { ruleReason, aiReason })
-    return c.json(
-      {
-        error:
-          "Please don't include contact details in the description. They are shared automatically once your listing is unlocked.",
-        field: 'description',
-      },
-      422
-    )
+    return c.json(errorBody('contact_info'), 422)
   }
 
   const id = await insertBuy(c.env, input)
