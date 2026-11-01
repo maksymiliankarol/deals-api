@@ -1,0 +1,7 @@
+CREATE TABLE buy (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  description TEXT NOT NULL,
+  email       TEXT NOT NULL,
+  phone       TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

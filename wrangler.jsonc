@@ -1,0 +1,33 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "deals-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-30",
+	"routes": [
+		{ "pattern": "deals-api.metalogrom.com", "custom_domain": true }
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "deals-db",
+			"database_id": "bbbb9dae-6b7f-4711-b3f3-2e6b9e58a7cc"
+		}
+	],
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "deals-buy",
+			"remote": true
+		}
+	],
+	"ratelimits": [
+		{
+			"name": "RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 20,
+				"period": 60
+			}
+		}
+	]
+}
