@@ -1,15 +1,5 @@
 # README
 
-## Git
-
-```bash
-git status
-git add .
-git commit -m "Changes"
-git push
-
-```
-
 ## Curl
 
 ### Creating buy listing

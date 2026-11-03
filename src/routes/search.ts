@@ -7,7 +7,7 @@ import { rerankBuy } from "../lib/rerank-buy";
 
 const search = new Hono<{ Bindings: CloudflareBindings }>();
 
-search.get("/search", vValidator("query", SearchSchema), async (c) => {
+search.get("/", vValidator("query", SearchSchema), async (c) => {
   const { q } = c.req.valid("query");
 
   // 1. Recall: wide net from Vectorize
