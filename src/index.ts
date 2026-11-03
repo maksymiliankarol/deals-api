@@ -17,7 +17,14 @@ app.use(
   rateLimit,
 );
 
-app.get("/message", (c) => c.text("Hello Hono!"));
+// This is for installing cli client
+app.get("/install-cli", (c) =>
+  c.redirect(
+    "https://raw.githubusercontent.com/maksymiliankarol/deals-cli/main/install.sh",
+    302,
+  )
+);
+
 app.route("/buy", buy);
 app.route("/search", search);
 
