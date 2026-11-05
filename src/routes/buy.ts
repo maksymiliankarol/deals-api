@@ -18,10 +18,12 @@ buy.post("/", vValidator("json", BuySchema), async (c) => {
     .first<{ id: number }>();
 
   // 3. Store the vectorize under the same id
-  await c.env.VECTORIZE.upsert([{ 
-    id: String(row!.id), 
-    values: embedding 
-  }]);
+  try {
+    await c.env.VECTORIZE.upsert([{ id: String(row!.id), values: embedding }]);
+  } catch (e) {
+    await c.env.DB.prepare("DELETE FROM buy WHERE id = ?").bind(row!.id).run();
+    throw e;
+  }
 
   return c.json(row, 201);
 });

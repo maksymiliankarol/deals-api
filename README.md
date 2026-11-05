@@ -1,5 +1,11 @@
 # README
 
+## How it started
+
+```bash
+pnpm create hono my-app
+```
+
 ## Curl
 
 ### Creating buy listing

@@ -6,6 +6,11 @@ import { cors } from "hono/cors";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
+app.onError((e, c) => {
+  console.error(e);
+  return c.json({ error: "Internal error" }, 500);
+});
+
 app.use(
   "/*",
   cors({

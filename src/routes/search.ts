@@ -1,7 +1,7 @@
 import { vValidator } from "@hono/valibot-validator";
 import { Hono } from "hono";
 import { SearchSchema } from "../schema";
-import { BuyRow } from "../types";
+import type { BuyRow } from "../types";
 import { embedBuy } from "../lib/embed-buy";
 import { rerankBuy } from "../lib/rerank-buy";
 
