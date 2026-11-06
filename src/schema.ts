@@ -9,3 +9,11 @@ export const BuySchema = v.object({
 export const SearchSchema = v.object({
   q: v.pipe(v.string(), v.trim(), v.minLength(3), v.maxLength(500)),
 });
+
+export const IdParamSchema = v.object({
+  id: v.pipe(v.string(), v.regex(/^[1-9][0-9]{0,9}$/), v.transform(Number)),
+});
+
+export const SessionParamSchema = v.object({
+  sessionId: v.pipe(v.string(), v.regex(/^cs_(test|live)_[A-Za-z0-9]{10,200}$/)),
+});

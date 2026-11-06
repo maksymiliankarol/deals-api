@@ -20,7 +20,9 @@ search.get("/", vValidator("query", SearchSchema), async (c) => {
   const placeholders = ids.map(() => "?").join(",");
   const { results } = await c.env.DB
     .prepare(
-      `SELECT id, description, created_at FROM buy WHERE id IN (${placeholders})`
+      `SELECT id, description, created_at FROM buy
+      WHERE id IN (${placeholders})
+        AND (reserved_until IS NULL OR reserved_until < datetime('now'))`
     )
     .bind(...ids)
     .all<BuyRow>();

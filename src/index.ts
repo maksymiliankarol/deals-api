@@ -1,8 +1,9 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { rateLimit } from "./middleware/rate-limit";
 import buy from "./routes/buy";
 import search from "./routes/search";
-import { rateLimit } from "./middleware/rate-limit";
-import { cors } from "hono/cors";
+import stripe from "./routes/stripe";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -10,6 +11,8 @@ app.onError((e, c) => {
   console.error(e);
   return c.json({ error: "Internal error" }, 500);
 });
+
+app.route("/stripe", stripe);
 
 app.use(
   "/*",
