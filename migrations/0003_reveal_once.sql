@@ -1,0 +1,1 @@
+ALTER TABLE unlocked ADD COLUMN revealed_at TEXT;

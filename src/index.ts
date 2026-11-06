@@ -4,6 +4,7 @@ import { rateLimit } from "./middleware/rate-limit";
 import buy from "./routes/buy";
 import search from "./routes/search";
 import stripe from "./routes/stripe";
+import unlock from "./routes/unlock";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -35,5 +36,6 @@ app.get("/install-cli", (c) =>
 
 app.route("/buy", buy);
 app.route("/search", search);
+app.route("/unlock", unlock);
 
 export default app;
