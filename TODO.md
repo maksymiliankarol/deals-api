@@ -2,8 +2,6 @@
 
 - Cron job for deleting old buy listings (72h?)
 
-- Automatic refunds for the 'paid by listing gone' case, instead of the log line
+- Automatic refunds for the 'paid by listing gone' case, instead of the log line (still problem?)
 
 - A cap on open reservations per IP, against someone holding many listings
-
-- 
