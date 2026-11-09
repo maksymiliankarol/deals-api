@@ -31,6 +31,9 @@
 			"simple": { "limit": 20, "period": 60 }
 		}
 	],
+	"triggers": {
+		"crons": ["0 * * * *"]
+	},
 
 	"env": {
 		"dev": {

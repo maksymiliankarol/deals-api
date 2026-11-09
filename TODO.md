@@ -1,7 +1,7 @@
-- Regex and Ai check for sneaky contact details in buy listing description
+- AI check. This is the second layer for what regex misses, like “five five five, one two three...” or “find me on insta, it’s my name plus 88”. It costs money and adds latency, so it only runs on descriptions that passed the regex. Maybe @clef family model with cf.
 
-- Cron job for deleting old buy listings (72h?)
+- Cap on open reservations per IP. buy has no IP column yet, so it needs a small migration and a check in POST /unlock/:id.
 
-- Automatic refunds for the 'paid by listing gone' case, instead of the log line (still problem?)
+- Cron cleanup of old listings. This is a scheduled handler in wrangler.jsonc that deletes rows older than your limit (72h?) from D1 and their vectors from Vectorize.
 
-- A cap on open reservations per IP, against someone holding many listings
+- Automatic refunds. This is the biggest item: Stripe refund calls, plus a decision about when to refund (the “paid but listing gone” case).

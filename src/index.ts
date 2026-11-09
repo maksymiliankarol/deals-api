@@ -5,6 +5,7 @@ import buy from "./routes/buy";
 import search from "./routes/search";
 import stripe from "./routes/stripe";
 import unlock from "./routes/unlock";
+import { cleanup } from "./jobs/cleanup";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -38,4 +39,9 @@ app.route("/buy", buy);
 app.route("/search", search);
 app.route("/unlock", unlock);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: CloudflareBindings) {
+    await cleanup(env);
+  },
+};

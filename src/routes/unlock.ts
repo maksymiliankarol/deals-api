@@ -7,26 +7,47 @@ import { IdParamSchema, SessionParamSchema } from "../schema";
 // Stripe sessions live at least 30 min, so hold the listing a bit longer.
 const SESSION_MINUTES = 30;
 const RESERVE_MINUTES = 35;
+const MAX_OPEN_RESERVATIONS = 3; // open holds one IP may have at the same time
 
 const unlock = new Hono<{ Bindings: CloudflareBindings }>();
 
 unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
   const { id } = c.req.valid("param");
   const isCli = c.req.query("client") === "cli";
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
 
-  // 1. Reserve atomically: only works if the listing is free or its old hold expired
+  // 1. Reserve atomically: the listing must be free (or its old hold expired)
+  //    and this IP must have fewer than MAX_OPEN_RESERVATIONS open holds
   const reserved = await c.env.DB
     .prepare(
       `UPDATE buy
       SET reserved_until = datetime('now', '+${RESERVE_MINUTES} minutes'),
-          stripe_session_id = NULL
-      WHERE id = ? AND (reserved_until IS NULL OR reserved_until < datetime('now'))
+          stripe_session_id = NULL,
+          reserved_by = ?1
+      WHERE id = ?2
+        AND (reserved_until IS NULL OR reserved_until < datetime('now'))
+        AND (SELECT COUNT(*) FROM buy
+             WHERE reserved_by = ?1 AND reserved_until > datetime('now')) < ?3
       RETURNING id`
     )
-    .bind(id)
+    .bind(ip, id, MAX_OPEN_RESERVATIONS)
     .first();
 
-  if (!reserved) return c.json({ error: "Listing not available" }, 409);
+  if (!reserved) {
+    // Either this IP is at its cap, or the listing is taken
+    const held = await c.env.DB
+      .prepare("SELECT COUNT(*) AS n FROM buy WHERE reserved_by = ? AND reserved_until > datetime('now')")
+      .bind(ip)
+      .first<{ n: number }>();
+
+    if (held && held.n >= MAX_OPEN_RESERVATIONS) {
+      return c.json(
+        { error: "Too many open reservations. Pay for one or wait for it to expire.", code: "too_many_reservations" },
+        429,
+      );
+    }
+    return c.json({ error: "Listing not available" }, 409);
+  }
 
   // 2. Create the checkout session; release the hold if anything fails
   try {
@@ -58,7 +79,7 @@ unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
     return c.json({ url: session.url, sessionId: session.id }, 201);
   } catch (e) {
     await c.env.DB
-      .prepare("UPDATE buy SET reserved_until = NULL, stripe_session_id = NULL WHERE id = ?")
+      .prepare("UPDATE buy SET reserved_until = NULL, stripe_session_id = NULL, reserved_by = NULL WHERE id = ?")
       .bind(id)
       .run();
     throw e;
