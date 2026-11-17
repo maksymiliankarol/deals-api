@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { rateLimit } from "./middleware/rate-limit";
 import buy from "./routes/buy";
 import search from "./routes/search";
@@ -16,16 +15,8 @@ app.onError((e, c) => {
 
 app.route("/stripe", stripe);
 
-app.use(
-  "/*",
-  cors({
-    origin: ["https://deals.metalogrom.com", "http://localhost:5173"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
-    maxAge: 86400,
-  }),
-  rateLimit,
-);
+// No CORS because no web app is poiting endpoints
+app.use("/*", rateLimit);
 
 // This is for installing cli client
 app.get("/install-cli", (c) =>

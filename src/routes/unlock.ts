@@ -14,7 +14,6 @@ const unlock = new Hono<{ Bindings: CloudflareBindings }>();
 
 unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
   const { id } = c.req.valid("param");
-  const isCli = c.req.query("client") === "cli";
   const ip = c.req.header("cf-connecting-ip") ?? "unknown";
 
   // 1. Reserve atomically: the listing must be free (or its old hold expired)
@@ -61,10 +60,8 @@ unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
       ],
       client_reference_id: String(id),
       expires_at: Math.floor(Date.now() / 1000) + SESSION_MINUTES * 60,
-      success_url: isCli
-        ? `${c.env.WEB_URL}/cli-success`
-        : `${c.env.WEB_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: isCli ? `${c.env.WEB_URL}/cli-success?cancelled=1` : `${c.env.WEB_URL}/sell`,
+      success_url: `${c.env.WEB_URL}/success`,
+      cancel_url: `${c.env.WEB_URL}/success?cancelled=1`,
     });
 
     await c.env.DB
