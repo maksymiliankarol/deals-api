@@ -4,8 +4,9 @@ import { getStripe } from "../lib/stripe";
 import { UNLOCK_PRICE } from "../lib/pricing";
 import { IdParamSchema, SessionParamSchema } from "../schema";
 
-// Stripe sessions live at least 30 min, so hold the listing a bit longer.
-const SESSION_MINUTES = 30;
+// Stripe wants a session to live at least 30 min, so keep a margin.
+// The listing is held a bit longer than the session.
+const SESSION_MINUTES = 31;
 const RESERVE_MINUTES = 35;
 const MAX_OPEN_RESERVATIONS = 3; // open holds one IP may have at the same time
 
@@ -21,30 +22,25 @@ unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
   const reserved = await c.env.DB
     .prepare(
       `UPDATE buy
-      SET reserved_until = datetime('now', '+${RESERVE_MINUTES} minutes'),
-          stripe_session_id = NULL,
-          reserved_by = ?1
-      WHERE id = ?2
-        AND (reserved_until IS NULL OR reserved_until < datetime('now'))
-        AND (SELECT COUNT(*) FROM buy
-             WHERE reserved_by = ?1 AND reserved_until > datetime('now')) < ?3
-      RETURNING id`
+       SET reserved_until = datetime('now', ?4), stripe_session_id = NULL, reserved_by = ?1
+       WHERE id = ?2
+         AND (reserved_until IS NULL OR reserved_until < datetime('now'))
+         AND (SELECT COUNT(*) FROM buy
+              WHERE reserved_by = ?1 AND reserved_until > datetime('now')) < ?3
+       RETURNING id`
     )
-    .bind(ip, id, MAX_OPEN_RESERVATIONS)
+    .bind(ip, id, MAX_OPEN_RESERVATIONS, `+${RESERVE_MINUTES} minutes`)
     .first();
 
   if (!reserved) {
     // Either this IP is at its cap, or the listing is taken
-    const held = await c.env.DB
+    const { n } = (await c.env.DB
       .prepare("SELECT COUNT(*) AS n FROM buy WHERE reserved_by = ? AND reserved_until > datetime('now')")
       .bind(ip)
-      .first<{ n: number }>();
+      .first<{ n: number }>())!;
 
-    if (held && held.n >= MAX_OPEN_RESERVATIONS) {
-      return c.json(
-        { error: "Too many open reservations. Pay for one or wait for it to expire.", code: "too_many_reservations" },
-        429,
-      );
+    if (n >= MAX_OPEN_RESERVATIONS) {
+      return c.json({ error: "Too many open reservations. Pay for one or wait for it to expire." }, 429);
     }
     return c.json({ error: "Listing not available" }, 409);
   }
@@ -62,7 +58,7 @@ unlock.post("/:id", vValidator("param", IdParamSchema), async (c) => {
           },
           quantity: 1,
         },
-      ],      
+      ],
       client_reference_id: String(id),
       expires_at: Math.floor(Date.now() / 1000) + SESSION_MINUTES * 60,
       success_url: isCli
@@ -102,7 +98,6 @@ unlock.get("/:sessionId", vValidator("param", SessionParamSchema), async (c) => 
     )
     .bind(sessionId)
     .first();
-
   if (row) return c.json(row);
 
   // 2. Not claimed: was it already revealed?
@@ -110,18 +105,13 @@ unlock.get("/:sessionId", vValidator("param", SessionParamSchema), async (c) => 
     .prepare("SELECT 1 FROM unlocked WHERE stripe_session_id = ?")
     .bind(sessionId)
     .first();
-
   if (revealed) return c.json({ error: "Already revealed" }, 410);
 
   // 3. Paid, but the webhook hasn't moved the row yet: tell the client to retry
   const pending = await c.env.DB
-    .prepare(
-      `SELECT 1 FROM buy
-       WHERE stripe_session_id = ? AND reserved_until > datetime('now')`
-    )
+    .prepare("SELECT 1 FROM buy WHERE stripe_session_id = ? AND reserved_until > datetime('now')")
     .bind(sessionId)
     .first();
-
   if (pending) return c.json({ status: "pending" }, 202);
 
   return c.json({ error: "Not found" }, 404);

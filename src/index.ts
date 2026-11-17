@@ -41,7 +41,5 @@ app.route("/unlock", unlock);
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, env: CloudflareBindings) {
-    await cleanup(env);
-  },
-};
+  scheduled: (_controller, env) => cleanup(env),
+} satisfies ExportedHandler<CloudflareBindings>;

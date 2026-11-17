@@ -1,5 +1,4 @@
 import * as v from "valibot";
-import { hasContactDetails } from "./lib/contact-check";
 
 export const BuySchema = v.object({
   description: v.pipe(v.string(), v.trim(), v.minLength(10), v.maxLength(500)),
